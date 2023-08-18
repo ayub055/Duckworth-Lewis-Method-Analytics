@@ -92,10 +92,10 @@ def get_data(data_path) -> Union[pd.DataFrame, np.ndarray]:
         return None
     
 def null_details(data: Union[pd.DataFrame, np.ndarray]):
-    print(f"Are there any Null Values in dataset? ---- {data.isnull().values.any()}")
-    print(f"Total null values in dataset? ---- {data.isnull().sum().sum()}")
-    print(f"The size of our dataset is {len(data)}")
-    print(f"The size of our dataset is {len(data.columns)}")
+    print(f"Are there any Null Values in dataset? : {data.isnull().values.any()}")
+    print(f"Total null values in dataset? : {data.isnull().sum().sum()}")
+    print(f"Number of rows in our dataset : {len(data)}")
+    print(f"Number of columns in our dataset : {len(data.columns)}\n---------------------------\n")
     
 
 def select_columns(data: Union[pd.DataFrame, np.ndarray], columns_to_keep):
@@ -122,13 +122,11 @@ def preprocess_data(data: Union[pd.DataFrame, np.ndarray]) -> Union[pd.DataFrame
     # Dataset has 1109 NAN values in Run.Rate.Required Column Only
     columns_to_keep = ['Innings', 'Innings.Total.Runs', 'Total.Overs', 'Wickets.in.Hand', 'Over', 'Total.Runs']
     
-    print("Details before Preprocessing")
-    print("-"*40)
+    print("\nDetails before Preprocessing\n-------------\n")
     null_details(data)
     data = data.dropna()
     data = select_columns(data, columns_to_keep)
-    print("Details After Preprocessing")
-    print("-"*40)
+    print("\nDetails After Preprocessing\n-------------\n")
     null_details(data)
     
     return data
@@ -190,11 +188,11 @@ def main(args):
     """Main Function"""
 
     data = get_data(args['data_path'])  # Loading the data
-    print("Data loaded.")
+    print("\nData loaded.")
     
     # Preprocess the data
     data = preprocess_data(data)
-    print("Data preprocessed.")
+    print("Data preprocessed.\n")
     
     model = DLModel()  # Initializing the model
     model = train_model(data, model)  # Training the model
