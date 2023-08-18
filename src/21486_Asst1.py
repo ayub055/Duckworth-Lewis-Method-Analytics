@@ -91,7 +91,19 @@ def get_data(data_path) -> Union[pd.DataFrame, np.ndarray]:
         print(f"File not found at '{data_path}'. Please provide the correct path.")
         return None
     
+def null_details(data: Union[pd.DataFrame, np.ndarray]):
+    print(f"Are there any Null Values in dataset? ---- {data.isnull().values.any()}")
+    print(f"Total null values in dataset? ---- {data.isnull().sum().sum()}")
+    print(f"The size of our dataset is {len(data)}")
+    print(f"The size of our dataset is {len(data.columns)}")
+    
 
+def select_columns(data: Union[pd.DataFrame, np.ndarray], columns_to_keep):
+    if isinstance(data, np.ndarray):
+        data = pd.DataFrame(data)
+
+    data = data[columns_to_keep]
+    return data
 
 def preprocess_data(data: Union[pd.DataFrame, np.ndarray]) -> Union[pd.DataFrame, np.ndarray]:
     """Preprocesses the dataframe by
@@ -106,8 +118,20 @@ def preprocess_data(data: Union[pd.DataFrame, np.ndarray]) -> Union[pd.DataFrame
     Returns:
         pd.DataFrame, np.ndarray: Datastructure containing the cleaned data.
     """
-
-    return None
+    
+    # Dataset has 1109 NAN values in Run.Rate.Required Column Only
+    columns_to_keep = ['Innings', 'Innings.Total.Runs', 'Total.Overs', 'Wickets.in.Hand', 'Over', 'Total.Runs']
+    
+    print("Details before Preprocessing")
+    print("-"*40)
+    null_details(data)
+    data = data.dropna()
+    data = select_columns(data, columns_to_keep)
+    print("Details After Preprocessing")
+    print("-"*40)
+    null_details(data)
+    
+    return data
 
 
 def train_model(data: Union[pd.DataFrame, np.ndarray], model: DLModel) -> DLModel:
