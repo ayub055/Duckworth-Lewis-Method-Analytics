@@ -5,6 +5,8 @@ import scipy as sp
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import List, Union
+import math
+
 
 
 if not os.path.exists('../models'):
@@ -22,6 +24,7 @@ class DLModel:
         """Initialize the model."""
         self.Z0 = [None] * 10
         self.L = None
+        self.loss = 0
     
     def get_predictions(self, X, Z_0=None, w=10, L=None) -> np.ndarray:
         """Get the predictions for the given X values.
@@ -38,7 +41,15 @@ class DLModel:
         Returns:
             np.array: Predicted score possible
         """
-        pass
+        if Z_0 is None:
+            Z_0 = self.Z0[w - 1]  # Using Z0 for given wickets
+            
+        if L is None:
+            L = self.L
+        
+        predicted_scores = Z_0 * (1 - np.exp(-1 * L * X / Z_0))
+        return predicted_scores
+        
 
     def calculate_loss(self, Params, X, Y, w=10) -> float:
         """ Calculate the loss for the given parameters and datapoints.
@@ -72,6 +83,8 @@ class DLModel:
         """
         with open(path, 'rb') as f:
             (self.L, self.Z0) = pickle.load(f)
+        
+        return self
 
 
 def get_data(data_path) -> Union[pd.DataFrame, np.ndarray]:
@@ -124,7 +137,7 @@ def preprocess_data(data: Union[pd.DataFrame, np.ndarray]) -> Union[pd.DataFrame
     
     print("\nDetails before Preprocessing\n-------------\n")
     null_details(data)
-    data = data.dropna()
+    #data = data.dropna()
     data = select_columns(data, columns_to_keep)
     print("\nDetails After Preprocessing\n-------------\n")
     null_details(data)
@@ -132,15 +145,74 @@ def preprocess_data(data: Union[pd.DataFrame, np.ndarray]) -> Union[pd.DataFrame
     return data
 
 
-def train_model(data: Union[pd.DataFrame, np.ndarray], model: DLModel) -> DLModel:
+def train_model(data: Union[pd.DataFrame, np.ndarray], model: DLModel)-> DLModel:
     """Trains the model
 
     Args:
         data (pd.DataFrame, np.ndarray): Datastructure containg the cleaned data
         model (DLModel): Model to be trained
     """
+    def fit_parameters(data):
+        '''
+        This procedure will fit the curve to optimise the overall loss function against 11 parameters.
+        :param innings_number:
+        :param runs_scored:
+        :param remaining_overs:
+        :param wickets_in_hand:
+        :return:optimised_res['fun']:Total Loss incurred
+        :return:optimised_res['x']:Optimised values of all 11 parameters.
+        '''
+        parameters = [10, 30, 40, 60, 90, 125, 150, 170, 190, 200,10]
+
+        innings_number    = data['Innings'].values
+        remaining_runs    = data['Innings.Total.Runs'].values - data['Total.Runs'].values
+        remaining_overs   = data['Total.Overs'].values - data['Over'].values
+        wickets_in_hand   = data['Wickets.in.Hand'].values
+
+        # print(f"are lenght of over remaining values equal to wicket in hand : {len(remaining_overs) == len(wickets_in_hand)}")
+        optimised_res = sp.optimize.minimize(sum_of_squared_errors_loss_function,parameters,
+                          args=[innings_number, remaining_runs, remaining_overs, wickets_in_hand],
+                          method='L-BFGS-B')
+        return optimised_res['fun'],optimised_res['x']
+
+    def sum_of_squared_errors_loss_function(parameters,args):
+        '''
+        This procedure defines the objective function which I have passed in scipy.optimize.minimize() function.
+        It calculated all total squared error loss for all the data points for innings 1.
+        :param parameters: List contains 11 parameters
+        :param args: List contains innings_number,runs_scored,remaining_overs,wickets_in_hand
+        :return:total_squared_error of the objective function.
+        '''
+        total_squared_error=0
+        l_param=parameters[10]
+        innings_number = args[0]
+        runs_scored=args[1]
+        remaining_overs=args[2]
+        wickets_in_hand=args[3]
+        for i in range(len(wickets_in_hand)):
+            if innings_number[i] == 1:
+                runscored = runs_scored[i]
+                overremain = remaining_overs[i]
+                wicketinhand = wickets_in_hand[i]
+                Z0=parameters[wicketinhand - 1]
+                if runscored > 0:
+                    predicted_run =  Z0 * (1 - np.exp(-1*l_param * overremain / Z0))
+                    total_squared_error=total_squared_error + (math.pow(predicted_run - runscored, 2))
+        return total_squared_error
+    
+    
+    loss_value, param = fit_parameters(data)
+    
+    model.L = param[-1]  # Update L value
+    model.Z0 = param[:-1]  # Update Z0 valuues
+    model.loss = loss_value
+
+
+
+    print("Total Loss:", loss_value)
     
     return model
+
 
 
 def plot(model: DLModel, plot_path: str) -> None:
@@ -151,7 +223,29 @@ def plot(model: DLModel, plot_path: str) -> None:
         model (DLModel): Trained model
         plot_path (str): Path to save the plot
     """
-    pass
+    Z0 = model.Z0
+    L = model.L
+    optparameters = np.insert(Z0, 10, L)
+    #print(len(optparameters))
+    plt.figure(1)
+    plt.title("Expected Runs vs Overs Remaininng")
+    plt.xlim((0, 50))
+    plt.ylim((0, 250))
+    plt.xticks([0, 10, 20, 30, 40, 50])
+    plt.yticks([0, 50, 100, 150, 200, 250])
+    plt.xlabel('Overs remaining')
+    plt.ylabel('Expected Runs')
+    colors = ['r', 'g', 'b', 'y', 'c', 'm', 'k', '#555b65', '#999e45', '#222a55']
+    x=np.zeros((51))
+    for i in range(51):
+        x[i]=i
+    for i in range(len(optparameters)-1):
+        y_run=optparameters[i] * (1 - np.exp(-optparameters[10] * x /optparameters[i]))
+        plt.plot(x, y_run, c=colors[i], label='Z[' + str(i + 1) + ']')
+        plt.legend()
+    plt.savefig(plot_path)
+    plt.show()
+    plt.close()
 
 
 def print_model_params(model: DLModel) -> List[float]:
@@ -165,8 +259,20 @@ def print_model_params(model: DLModel) -> List[float]:
         array: 11 model parameters (Z_0(1), ..., Z_0(10), L)
 
     '''
+    Z0 = model.Z0
+    L = model.L
+    param = np.insert(Z0, 10, L)
     
-    return []
+    p_list = []
+    for i in range(len(param)):
+        p_list.append(param[i])
+    
+    for i in range(len(param)):
+        if(i == 10):
+            print("L :"+str(param[i]))
+        else:
+            print("Z["+str(i+1)+"] :"+str(param[i]))
+    return p_list
 
 
 def calculate_loss(model: DLModel, data: Union[pd.DataFrame, np.ndarray]) -> float:
@@ -180,8 +286,11 @@ def calculate_loss(model: DLModel, data: Union[pd.DataFrame, np.ndarray]) -> flo
     Returns:
         float: Normalised squared error loss for the given model and data
     '''
-    
-    return 0.0
+    num_data_first_innings = len(data[data['Innings'] == 1])
+    loss = model.loss
+    normalised_error = loss/num_data_first_innings
+    print(normalised_error)
+    return normalised_error
 
 
 def main(args):
@@ -196,11 +305,13 @@ def main(args):
     
     model = DLModel()  # Initializing the model
     model = train_model(data, model)  # Training the model
+
     model.save(args['model_path'])  # Saving the model
-    
+
     plot(model, args['plot_path'])  # Plotting the model
-    
+
     # Printing the model parameters
+    #model = model.load(args['model_path'])
     print_model_params(model)
 
     # Calculate the normalised squared error
