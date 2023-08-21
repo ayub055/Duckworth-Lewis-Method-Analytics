@@ -172,7 +172,7 @@ def train_model(data: Union[pd.DataFrame, np.ndarray], model: DLModel)-> DLModel
         # print(f"are lenght of over remaining values equal to wicket in hand : {len(remaining_overs) == len(wickets_in_hand)}")
         optimised_res = sp.optimize.minimize(sum_of_squared_errors_loss_function,parameters,
                           args=[innings_number, remaining_runs, remaining_overs, wickets_in_hand],
-                          method='L-BFGS-B')
+                          method='powell')
         return optimised_res['fun'],optimised_res['x']
 
     def sum_of_squared_errors_loss_function(parameters,args):
@@ -247,6 +247,39 @@ def plot(model: DLModel, plot_path: str) -> None:
     plt.show()
     plt.close()
 
+def plot_resource_remaining(model: DLModel, plot_path: str) -> None:
+    """ Plots the model predictions against the number of overs
+        remaining according to wickets in hand.
+
+    Args:
+        model (DLModel): Trained model
+        plot_path (str): Path to save the plot
+    """
+    
+    Z0 = model.Z0
+    L = model.L
+    optparameters = np.insert(Z0, 10, L)
+    plt.figure(1)
+    plt.title("Resource Remaining vs Overs Remaininng")
+    plt.xlim((0, 50))
+    plt.ylim((0, 100))
+    plt.xticks([0, 10, 20, 30, 40, 50])
+    plt.yticks([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
+    plt.xlabel('Overs remaining')
+    plt.ylabel('percentage Of Resource Remaining')
+    colors = ['r', 'g', 'b', 'y', 'c', 'm', 'k', '#555b65', '#999e45', '#222a55']
+    x = np.zeros((51))
+    for i in range(51):
+        x[i] = i
+    Z5010=optparameters[9] * (1 - np.exp(-optparameters[10] * 50 /optparameters[9]))
+    for i in range(len(optparameters)-1):
+        y_run=optparameters[i] * (1 - np.exp(-optparameters[10] * x /optparameters[i]))
+        plt.plot(x, (y_run/Z5010)*100, c=colors[i], label='Z[' + str(i + 1) + ']')
+        plt.legend()
+    plt.savefig(plot_path)
+    plt.show()
+    plt.close()
+
 
 def print_model_params(model: DLModel) -> List[float]:
     '''
@@ -309,9 +342,14 @@ def main(args):
     model.save(args['model_path'])  # Saving the model
 
     plot(model, args['plot_path'])  # Plotting the model
+    
+    #########+++++++++++++++++++++++++++++++++++++++++++++++#########   
+    #########   Added for plotting resource remain plot     ######### 
+    ########+++++++++++++++++++++++++++++++++++++++++++++++######### 
+    
+    #plot_resource_remaining(model, '/data/home/ayyoobmohd/Duckworth-Lewis-Stern-Method/plots/plot_resourceremain_vs_overremain.png')
 
     # Printing the model parameters
-    #model = model.load(args['model_path'])
     print_model_params(model)
 
     # Calculate the normalised squared error
@@ -322,6 +360,6 @@ if __name__ == '__main__':
     args = {
         "data_path": "../data/04_cricket_1999to2011.csv",
         "model_path": "../models/model.pkl",  # ensure that the path exists
-        "plot_path": "../plots/plot.png",  # ensure that the path exists
+        "plot_path": "../plots/plot_powell.png",  # ensure that the path exists
     }
     main(args)
